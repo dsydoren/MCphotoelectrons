@@ -1,0 +1,22 @@
+This software is provided for the purpose of reproducing the data used in the manuscript
+"Monte Carlo photoelectron code and its validation using Atmospheric Explorer E data" 
+by D. Sydorenko, R. Rankin, J. Liang, and E. Donovan submitted to journal Earth and 
+Space Science.
+
+This software can be used, copied, and/or modified for educational or academic, 
+non-commercial purposes. If a publication arises from such use of the software, please, 
+refer to the published version of the aforementioned manuscript.
+
+This software incorporates the MSIS® empirical atmospheric model
+software designed and provided by NRL. Use is governed by the Open Source
+Academic Research License Agreement contained in the file
+nrlmsis2.1_license.txt.
+
+This software includes IGRF-13 and IRI-2020 software developed by third
+parties. The use of these components is defined by the corresponding license agreements
+IGRF_LICENSE.txt and 00_iri-License.txt included with the software.
+
+This software is provided "as is", without any warranty. In no event the authors of 
+this software can be held liable for any damages related to the use of this software. 
+
+
