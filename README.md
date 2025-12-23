@@ -29,7 +29,7 @@ This directory contains all post-processing programs.
 
 MC_photoelectron_transport_code ---------------------------------------------------------
 
-This directory contains the source files (fortran and C) of the Monte-Carlo photoelectron 
+This directory contains the source files (fortran and C) of the Monte Carlo photoelectron 
 transport code. The source files include the kinetic photoelectron transport module 
 developed by Dmytro Sydorenko at the University of Alberta and the IGRF-13, NRLMSIS 2.1, 
 and IRI-2020 models.
