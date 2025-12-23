@@ -6,7 +6,9 @@ Space Science.
 The following directories are included in the package:
 
 calculation_AEE_orbit_458_all_input_files
+
 data_processing
+
 MC_photoelectron_transport_code
 
 Below is the brief decsription of the contents of these directories. Note that each 
