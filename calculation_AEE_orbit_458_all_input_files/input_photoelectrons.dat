@@ -1,0 +1,16 @@
+# number of primary particles per solar flux energy bin (>0)
+  50
+# desired distance between points on a field line [km]
+  5.0
+# number of energy bins in electron energy distribution function (EEDF)
+  250
+# energy bin size of the EEDF [eV]
+  1.0
+# number of parallel velocity bins in one direction in electron velocity distribution function
+  100
+# number of transverse velocity bins in electron velocity distribution function
+  100
+# maximal energy in the parallel direction [eV]
+  250.0
+# maximal energy in the transverse direction [eV]
+  250.0

@@ -1,0 +1,13 @@
+# below is the number of energy ranges
+    10
+# below, for each range provide in one line minimal and maximal energy (eV) and minimal and maximal pitch angles (deg)
+    5.0   13.0   146.22  166.22
+   13.0   21.0   146.22  166.22
+   21.0   29.0   146.22  166.22
+   29.0   37.0   146.22  166.22
+   37.0   45.0   146.22  166.22
+   45.0   53.0   146.22  166.22
+   53.0   61.0   146.22  166.22
+   61.0   69.0   146.22  166.22
+   69.0   77.0   146.22  166.22
+   77.0   85.0   146.22  166.22

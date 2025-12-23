@@ -1,0 +1,32 @@
+# spacecraft frame: z is vertical
+# z is in the vertical direction
+# x is in vertical plane containing spacecraft velocity, in the direction of spacecraft motion
+# y is vector product of z and x
+# it is assumed that photoelectron sensor is pointed along the y-axis in the spacecraft frame, as sensor #1 on AE-E
+# full angle of the field of view of the spacecraft photoelectron sensor (deg)
+  20.0
+# for plotting, length of line representing sensor's field of view axis (km)
+  500.0
+# for electron distribution over energy and pitch angle define below
+# number of energy bins
+   250
+# size of energy bin (eV)
+   1.0
+# number of pitch angle bins (pitch angle varies between 0 and pi)
+   59
+# save the electron distribution over energy and pitch angle into a file for each orbit point (1/0 = Yes/No)
+    1
+# number of energy-pitch angle ranges where particle fluxes will be calculated (<=20)
+   10
+# for each range give (in one line) minimal/ maximal energy (eV)
+   5.0000   13.0
+  13.0001   21.0
+  21.0001   29.0
+  29.0001   37.0
+  37.0001   45.0
+  45.0001   53.0
+  53.0001   61.0
+  61.0001   69.0
+  69.0001   77.0
+  77.0001   85.0
+
