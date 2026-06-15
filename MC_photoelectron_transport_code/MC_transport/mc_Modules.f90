@@ -35,7 +35,7 @@ MODULE PhysicalConstants  !CurrentProblemValues
 
 ! relative atomic masses of ion species
   REAL(8), PARAMETER :: M_H_amu = 1.0_8                           ! Hydrogen ion mass [a.m.u.]
-  REAL(8), PARAMETER :: M_He_amu = 4.0_8                          ! Helium ion mass [a.m.u.]
+!  REAL(8), PARAMETER :: M_He_amu = 4.0_8                          ! Helium ion mass [a.m.u.]
   REAL(8), PARAMETER :: M_N_amu = 14.0_8                          ! Nitrogen ion mass [a.m.u.]
   REAL(8), PARAMETER :: M_O_amu = 16.0_8                          ! Oxygen ion mass [a.m.u.]
   REAL(8), PARAMETER :: M_N2_amu = 28.0_8                         ! Nitrogen molecula mass [a.m.u.]
@@ -113,40 +113,47 @@ END MODULE SpacecraftValues
 !
 MODULE Photoelectrons
 
-  INTEGER N_cascades_per_energy_bin != 100 !50 ! 100 ## !800 !50 !10  ! 4
+  INTEGER, PARAMETER :: EUVAC = 0
+  INTEGER, PARAMETER :: f76 = 1
+  INTEGER, PARAMETER :: f74113 = 2
+
+  INTEGER EUV_spectrum_model
+  INTEGER N_split_EUVAC
+
+  INTEGER max_N_cascades_per_EUV_flux
+  REAL(8) EUV_energy_flux_onecascade_1e9eVcm2s   ! in units of (10^9 eV/cm^2/s) reasonable values are 0.5-0.2
+
+  REAL(8) collfreq_precision_factor  ! used here :: Coll_dt_s = collfreq_precision_factor / recent_max_en_coll_frequency_s1, do not recommend setting it >0.2
 
   REAL(8) factor_energy_eV
   REAL(8) efactor_eV_to_ms
 
-  integer, parameter :: N_solar_bins = 37
+  INTEGER N_solar_bins  ! 916  for f76, 853 for f74113
 
-  REAL solar_flux_phcm2s1(1:N_solar_bins)   ! solar flux [10^9 photons cm^-2 s^-1]
-  REAL solar_flux_energy_bin_eV(1:N_solar_bins)
+  REAL, ALLOCATABLE :: solar_flux_phcm2s1(:)                 ! solar flux [10^9 photons cm^-2 s^-1]
+  REAL, ALLOCATABLE :: solar_flux_energy_bin_eV(:)
 
 ! used to calculate photon flux attenuation
-  REAL sigma_tot_O_cm2(1:N_solar_bins)            ! total cross section [10^-18 cm^2] for atomic oxygen          
-  REAL sigma_tot_N2_cm2(1:N_solar_bins)           ! - " -, molecular nitrogen             
-  REAL sigma_tot_O2_cm2(1:N_solar_bins)           ! - " -, molecular oxygen
-  REAL sigma_tot_He_cm2(1:N_solar_bins)           ! - " -, helium
+  REAL, ALLOCATABLE :: sigma_tot_O_cm2(:)            ! total cross section [10^-18 cm^2] for atomic oxygen          
+  REAL, ALLOCATABLE :: sigma_tot_N2_cm2(:)           ! - " -, molecular nitrogen             
+  REAL, ALLOCATABLE :: sigma_tot_O2_cm2(:)           ! - " -, molecular oxygen
 
 ! used to calculate ionization rates
-  REAL sigma_ion_N2_to_N2_cm2(1:N_solar_bins)     ! ionization cross section [10^-18 cm^2] for molecular nitrogen, N2+
-  REAL sigma_ion_N2_to_N_cm2(1:N_solar_bins)      ! - " -, molecular nitrogen, N+
+  REAL, ALLOCATABLE :: sigma_ion_N2_to_N2_cm2(:)     ! ionization cross section [10^-18 cm^2] for molecular nitrogen, N2+
+  REAL, ALLOCATABLE :: sigma_ion_N2_to_N_cm2(:)      ! - " -, molecular nitrogen, N+
 
-  REAL sigma_ion_O_4S_cm2(1:N_solar_bins)         ! - " -, atomic oxygen, O+4S
-  REAL sigma_ion_O_2D_cm2(1:N_solar_bins)         ! - " -, atomic oxygen, O+2D
-  REAL sigma_ion_O_2P_cm2(1:N_solar_bins)         ! - " -, atomic oxygen, O+2P
-  REAL sigma_ion_O_4P_cm2(1:N_solar_bins)         ! - " -, atomic oxygen, O+4P
-  REAL sigma_ion_O_2Pst_cm2(1:N_solar_bins)       ! - " -, atomic oxygen, O+2P*
+  REAL, ALLOCATABLE :: sigma_ion_O_4S_cm2(:)         ! - " -, atomic oxygen, O+4S
+  REAL, ALLOCATABLE :: sigma_ion_O_2D_cm2(:)         ! - " -, atomic oxygen, O+2D
+  REAL, ALLOCATABLE :: sigma_ion_O_2P_cm2(:)         ! - " -, atomic oxygen, O+2P
+  REAL, ALLOCATABLE :: sigma_ion_O_4Pst_cm2(:)       ! - " -, atomic oxygen, O+4P*
+  REAL, ALLOCATABLE :: sigma_ion_O_2Pst_cm2(:)       ! - " -, atomic oxygen, O+2P*
 
-  REAL sigma_ion_O2_to_O2_cm2(1:N_solar_bins)     ! - " -, molecular oxygen, O2+
-  REAL sigma_ion_O2_to_O_cm2(1:N_solar_bins)      ! - " -, molecular oxygen, O+
+  REAL, ALLOCATABLE :: sigma_ion_O2_to_O2_cm2(:)     ! - " -, molecular oxygen, O2+
+  REAL, ALLOCATABLE :: sigma_ion_O2_to_O_cm2(:)      ! - " -, molecular oxygen, O+
 
-  REAL sigma_ion_He_cm2(1:N_solar_bins)           ! - " -, He, He+
+  INTEGER, PARAMETER :: N_photoe_producing_channels = 9          ! number of ionization reactions between an EUV photon and a neutral
 
-  INTEGER, PARAMETER :: N_photoe_producing_channels = 10          ! number of ionization reactions between an EUV photon and a neutral
-
-  integer, parameter :: N_colkind = 60
+  integer, parameter :: N_colkind = 59
   real(8) threshold_eV(1:N_colkind)
 
   real(8) threshold_photoion_N2_to_N2_eV
@@ -155,16 +162,11 @@ MODULE Photoelectrons
   real(8) threshold_photoion_O_4S_eV
   real(8) threshold_photoion_O_2D_eV
   real(8) threshold_photoion_O_2P_eV
-  real(8) threshold_photoion_O_4P_eV
+  real(8) threshold_photoion_O_4Pst_eV
   real(8) threshold_photoion_O_2Pst_eV
 
   real(8) threshold_photoion_O2_to_O2_eV
   real(8) threshold_photoion_O2_to_O_eV
-
-  real(8) threshold_photoion_He_eV
-
-  INTEGER eedf_N_of_energy_bins
-  REAL(8) energy_bin_size_eV
 
   INTEGER max_evdf_N_vpar
   INTEGER max_evdf_N_vperp
@@ -198,11 +200,9 @@ MODULE field_line
   TYPE field_line_data
      REAL(8) L_m
      REAL(8) fts
-     REAL(8) columnar_content_He_m2
      REAL(8) columnar_content_O_m2
      REAL(8) columnar_content_N2_m2
      REAL(8) columnar_content_O2_m2
-     REAL(8) Nn_He_m3
      REAL(8) Nn_O_m3
      REAL(8) Nn_N2_m3
      REAL(8) Nn_O2_m3
@@ -210,7 +210,6 @@ MODULE field_line
      REAL(8) Te_K
      REAL(8) Ne_m3
 
-     REAL(8) rate_iHe_production_m3s
      REAL(8) rate_iN_production_m3s
      REAL(8) rate_iO_production_m3s
      REAL(8) rate_iN2_production_m3s
@@ -222,14 +221,16 @@ MODULE field_line
      REAL(8), ALLOCATABLE :: Ge_m2s_range(:)
      REAL(8), ALLOCATABLE :: Ge_par_m2s_range(:)
 
-     real(8), allocatable :: source_EUV_m3s_range(:)
-     real(8), allocatable :: source_photoe_m3s_range(:)
+     real(8), allocatable :: source_EUV_m3s_range_channel(:,:)
+     real(8), allocatable :: source_photoe_m3s_range_channel(:,:)
 
-     real(8), allocatable :: source_neutrals_m3s_range(:)
+     real(8), allocatable :: source_neutrals_m3s_range_coll(:,:)
      real(8), allocatable :: source_plasma_m3s_range(:)
+     real(8), allocatable :: source_Coulomb_m3s_range(:)
 
-     real(8), allocatable :: sink_neutrals_m3s_range(:)
+     real(8), allocatable :: sink_neutrals_m3s_range_coll(:,:)
      real(8), allocatable :: sink_plasma_m3s_range(:)
+     real(8), allocatable :: sink_Coulomb_m3s_range(:)
 
   END TYPE field_line_data
 
@@ -242,6 +243,12 @@ MODULE field_line
   REAL(8), ALLOCATABLE :: min_pitch_angle_range(:)
   REAL(8), ALLOCATABLE :: max_pitch_angle_range(:)
 
+  integer N_coll_ranges
+  real(8), allocatable :: min_w_eV_colrange(:)
+  real(8), allocatable :: max_w_eV_colrange(:)
+  real(8), allocatable :: coll_freq_s1_L_colkind_colrange(:,:,:)
+  real(8), allocatable :: density_m3_L_colrange(:,:)
+
 END MODULE field_line
 
 !--------------------------------------
@@ -250,14 +257,13 @@ module combined_collisions
 
   real(8), parameter :: lowen_dw_eV = 0.05_8
   real(8), parameter :: max_lowen_w_eV = 6.0_8
-  real(8), parameter :: max_highen_w_eV = 250.0_8  ! increase if the EUV spectrum includes energies higher than EUVAC (248eV at 50A)
+  real(8), parameter :: max_highen_w_eV = 450.0_8  ! increase if the EUV spectrum includes energies higher than f76 (435.487eV at 28.47A)
 
   integer N_lowen  ! array size 0:N_lowen
 
   real(8), allocatable :: lowen_CSV_N2_total_m3s(:)
   real(8), allocatable :: lowen_CSV_O2_total_m3s(:)
   real(8), allocatable :: lowen_CSV_O_total_m3s(:)
-  real(8), allocatable :: lowen_CSV_He_total_m3s(:)
 
   integer min_N_highen  ! 
   integer N_highen      ! array size min_N_highen:N_highen
@@ -265,6 +271,5 @@ module combined_collisions
   real(8), allocatable :: highen_CSV_N2_total_m3s(:)
   real(8), allocatable :: highen_CSV_O2_total_m3s(:)
   real(8), allocatable :: highen_CSV_O_total_m3s(:)
-  real(8), allocatable :: highen_CSV_He_total_m3s(:)
 
 end module combined_collisions

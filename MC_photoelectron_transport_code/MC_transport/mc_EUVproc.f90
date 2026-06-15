@@ -7,7 +7,11 @@ SUBROUTINE PREPARE_PHOTOELECTRONS
   USE photoelectrons
   USE field_line, ONLY : pfl_desired_dL_km
 
+  USE MPI
+
   IMPLICIT NONE
+
+  INTEGER ierr
 
   LOGICAL exists
   CHARACTER(1) buf
@@ -28,17 +32,23 @@ SUBROUTINE PREPARE_PHOTOELECTRONS
          
   OPEN (9, FILE = 'input_photoelectrons.dat')
 
-  READ (9, '(A1)') buf ! number of primary particles per solar flux energy bin (>0)
-  READ (9, *) N_cascades_per_energy_bin
+  READ (9, '(A1)') buf ! solar EUV spectrum model (0=EUVAC, 1=f76, 2=f74113)
+  READ (9, *) EUV_spectrum_model
+
+  READ (9, '(A1)') buf ! for EUVAC only, split each 50-Angstrom-wide-bin-averaged flux into this many monochromatic fluxes (>=1)
+  READ (9, *) N_split_EUVAC
+
+  READ (9, '(A1)') buf ! maximal number of primary particles per solar flux (>0)
+  READ (9, *) max_N_cascades_per_EUV_flux
+
+  READ (9, '(A1)') buf ! maximal EUV photon energy flux creating ONE primary particle per solar flux (10^9 eV/cm^2/s)
+  READ (9, *) EUV_energy_flux_onecascade_1e9eVcm2s
+
+  READ (9, '(A1)') buf ! precision factor for calculation of time step due to e-n collisions (<=0.2)
+  READ (9, *) collfreq_precision_factor
 
   READ (9, '(A1)') buf ! desired distance between points on a field line [km]
   READ (9, *) pfl_desired_dL_km
-
-  READ (9, '(A1)') buf ! number of energy bins in electron energy distribution function (EEDF)
-  READ (9, *) eedf_N_of_energy_bins
-
-  READ (9, '(A1)') buf ! energy bin size of the EEDF [eV]
-  READ (9, *) energy_bin_size_eV
 
   READ (9, '(A1)') buf ! number of parallel velocity bins in one direction in electron velocity distribution function
   READ (9, *) max_evdf_N_vpar
@@ -52,13 +62,25 @@ SUBROUTINE PREPARE_PHOTOELECTRONS
   READ (9, '(A1)') buf ! maximal energy in the transverse direction [eV]
   READ (9, *) max_energy_perp_eV
 
-!  desired_step_ray_ds = desired_step_ray_ds /  R_Earth_km
+  CLOSE (9, STATUS = 'KEEP')
+
+  IF (Rank_of_process.EQ.0) THEN
+     SELECT CASE (EUV_spectrum_model)
+        CASE (EUVAC)
+           PRINT '("### Selected solar EUV spectrum model: based on EUVAC with every 50-A-averaged flux split into ",i4," monochromatic fluxes")', N_split_EUVAC
+        CASE (f76)
+           PRINT '("### Selected solar EUV spectrum model: based on f76 reference spectrum")'
+        CASE (f74113)
+           PRINT '("### Selected solar EUV spectrum model: based on f74113 reference spectrum")'
+        CASE DEFAULT
+           PRINT '("Error in PREPARE_PHOTOELECTRONS : unknown EUV model ",i4," requested")', EUV_spectrum_model
+           CALL MPI_ABORT(MPI_COMM_WORLD, -1, ierr)
+     END SELECT
+  END IF
 
   dvpar_ms = SQRT(2.0_8 * max_energy_par_eV * e_Cl / m_e_kg) / max_evdf_N_vpar
 
   dvperp_ms = SQRT(2.0_8 * max_energy_perp_eV * e_Cl / m_e_kg) / max_evdf_N_vperp
-
-  CLOSE (9, STATUS = 'KEEP')
 
   factor_energy_eV = 0.5_8 * m_e_kg  / e_Cl
 
@@ -151,23 +173,21 @@ END SUBROUTINE UPDATE_TIME
 
 !-----------------------------------------------------
 !
-FUNCTION Get_EUV_production_rates_m3s( columnar_content_He_m2, &
-                                     & columnar_content_O_m2, &
+FUNCTION Get_EUV_production_rates_m3s( columnar_content_O_m2, &
                                      & columnar_content_N2_m2, &
                                      & columnar_content_O2_m2, &
-                                     & Nn_He_m3, Nn_O_m3, Nn_N2_m3, Nn_O2_m3)
+                                     & Nn_O_m3, Nn_N2_m3, Nn_O2_m3)
 
   USE Photoelectrons
 
   IMPLICIT NONE
 
-  REAL(8) Get_EUV_production_rates_m3s(1:10) ! 1 = He+; 2-6 = O+(4S/2D/2P/4P/2P*) from O; 7,8 = N+,N2+ from N2; 9,10 = O+,O2+ from O2
+  REAL(8) Get_EUV_production_rates_m3s(1:9) ! 1-5 = O+(4S/2D/2P/4P/2P*) from O; 6,7 = N+,N2+ from N2; 8,9 = O+,O2+ from O2
   
-  REAL(8) columnar_content_He_m2
   REAL(8) columnar_content_O_m2
   REAL(8) columnar_content_N2_m2
   REAL(8) columnar_content_O2_m2
-  real(8) Nn_He_m3, Nn_O_m3, Nn_N2_m3, Nn_O2_m3
+  real(8) Nn_O_m3, Nn_N2_m3, Nn_O2_m3
 
   INTEGER i
   REAL(8) optical_depth
@@ -176,47 +196,41 @@ FUNCTION Get_EUV_production_rates_m3s( columnar_content_He_m2, &
   Get_EUV_production_rates_m3s = 0.0_8
 
 ! special case, the observation point is in the Earth's shadow
-  IF ( (columnar_content_He_m2.LT.0.0_8).OR. &
-     & (columnar_content_O_m2.LT.0.0_8).OR. &
+  IF ( (columnar_content_O_m2.LT.0.0_8).OR. &
      & (columnar_content_N2_m2.LT.0.0_8).OR. &
      & (columnar_content_O2_m2.LT.0.0_8) ) RETURN
 
   DO i = 1, N_solar_bins
 
-     optical_depth = 1.0d-22 * ( sigma_tot_He_cm2(i) * columnar_content_He_m2 + &
-                               & sigma_tot_O_cm2(i)  * columnar_content_O_m2 + &
+     optical_depth = 1.0d-22 * ( sigma_tot_O_cm2(i)  * columnar_content_O_m2 + &
                                & sigma_tot_N2_cm2(i) * columnar_content_N2_m2 + &
                                & sigma_tot_O2_cm2(i) * columnar_content_O2_m2 )    ! 1e-22 because sigma is in 10^-18 cm^2 while columnar content is in m^-2 
 
      temp = dble(solar_flux_phcm2s1(i)) * EXP(-optical_depth)
 
-     Get_EUV_production_rates_m3s(1) = Get_EUV_production_rates_m3s(1) + temp * sigma_ion_He_cm2(i)
+     Get_EUV_production_rates_m3s(1) = Get_EUV_production_rates_m3s(1) + temp * sigma_ion_O_4S_cm2(i)
+     Get_EUV_production_rates_m3s(2) = Get_EUV_production_rates_m3s(2) + temp * sigma_ion_O_2D_cm2(i)
+     Get_EUV_production_rates_m3s(3) = Get_EUV_production_rates_m3s(3) + temp * sigma_ion_O_2P_cm2(i)
+     Get_EUV_production_rates_m3s(4) = Get_EUV_production_rates_m3s(4) + temp * sigma_ion_O_4Pst_cm2(i)
+     Get_EUV_production_rates_m3s(5) = Get_EUV_production_rates_m3s(5) + temp * sigma_ion_O_2Pst_cm2(i)
 
-     Get_EUV_production_rates_m3s(2) = Get_EUV_production_rates_m3s(2) + temp * sigma_ion_O_4S_cm2(i)
-     Get_EUV_production_rates_m3s(3) = Get_EUV_production_rates_m3s(3) + temp * sigma_ion_O_2D_cm2(i)
-     Get_EUV_production_rates_m3s(4) = Get_EUV_production_rates_m3s(4) + temp * sigma_ion_O_2P_cm2(i)
-     Get_EUV_production_rates_m3s(5) = Get_EUV_production_rates_m3s(5) + temp * sigma_ion_O_4P_cm2(i)
-     Get_EUV_production_rates_m3s(6) = Get_EUV_production_rates_m3s(6) + temp * sigma_ion_O_2Pst_cm2(i)
+     Get_EUV_production_rates_m3s(6) = Get_EUV_production_rates_m3s(6) + temp * sigma_ion_N2_to_N_cm2(i)
+     Get_EUV_production_rates_m3s(7) = Get_EUV_production_rates_m3s(7) + temp * sigma_ion_N2_to_N2_cm2(i)
 
-     Get_EUV_production_rates_m3s(7) = Get_EUV_production_rates_m3s(7) + temp * sigma_ion_N2_to_N_cm2(i)
-     Get_EUV_production_rates_m3s(8) = Get_EUV_production_rates_m3s(8) + temp * sigma_ion_N2_to_N2_cm2(i)
-
-     Get_EUV_production_rates_m3s(9)  = Get_EUV_production_rates_m3s(9)  + temp * sigma_ion_O2_to_O_cm2(i)
-     Get_EUV_production_rates_m3s(10) = Get_EUV_production_rates_m3s(10) + temp * sigma_ion_O2_to_O2_cm2(i)
+     Get_EUV_production_rates_m3s(8) = Get_EUV_production_rates_m3s(8) + temp * sigma_ion_O2_to_O_cm2(i)
+     Get_EUV_production_rates_m3s(9) = Get_EUV_production_rates_m3s(9) + temp * sigma_ion_O2_to_O2_cm2(i)
   END DO
 
-  Get_EUV_production_rates_m3s(1) = Get_EUV_production_rates_m3s(1) * 1.0d-9 * Nn_He_m3   ! 1e-9 because solar flux is in 10^9 ph cm^-2 s^-1 and cross sections are in 10^-18 cm^2
-
+  Get_EUV_production_rates_m3s(1) = Get_EUV_production_rates_m3s(1) * 1.0d-9 * Nn_O_m3   ! 1e-9 because solar flux is in 10^9 ph cm^-2 s^-1 and cross sections are in 10^-18 cm^2
   Get_EUV_production_rates_m3s(2) = Get_EUV_production_rates_m3s(2) * 1.0d-9 * Nn_O_m3   !
   Get_EUV_production_rates_m3s(3) = Get_EUV_production_rates_m3s(3) * 1.0d-9 * Nn_O_m3   !
-  Get_EUV_production_rates_m3s(4) = Get_EUV_production_rates_m3s(4) * 1.0d-9 * Nn_O_m3   !
+  Get_EUV_production_rates_m3s(4) = Get_EUV_production_rates_m3s(4) * 1.0d-9 * Nn_O_m3
   Get_EUV_production_rates_m3s(5) = Get_EUV_production_rates_m3s(5) * 1.0d-9 * Nn_O_m3
-  Get_EUV_production_rates_m3s(6) = Get_EUV_production_rates_m3s(6) * 1.0d-9 * Nn_O_m3
 
+  Get_EUV_production_rates_m3s(6) = Get_EUV_production_rates_m3s(6) * 1.0d-9 * Nn_N2_m3
   Get_EUV_production_rates_m3s(7) = Get_EUV_production_rates_m3s(7) * 1.0d-9 * Nn_N2_m3
-  Get_EUV_production_rates_m3s(8) = Get_EUV_production_rates_m3s(8) * 1.0d-9 * Nn_N2_m3
 
-  Get_EUV_production_rates_m3s(9)  = Get_EUV_production_rates_m3s(9)  * 1.0d-9 * Nn_O2_m3
-  Get_EUV_production_rates_m3s(10) = Get_EUV_production_rates_m3s(10) * 1.0d-9 * Nn_O2_m3
+  Get_EUV_production_rates_m3s(8) = Get_EUV_production_rates_m3s(8) * 1.0d-9 * Nn_O2_m3
+  Get_EUV_production_rates_m3s(9) = Get_EUV_production_rates_m3s(9) * 1.0d-9 * Nn_O2_m3
 
 END FUNCTION Get_EUV_production_rates_m3s

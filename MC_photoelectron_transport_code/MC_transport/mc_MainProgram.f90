@@ -41,7 +41,7 @@ PROGRAM MAIN
   CALL MPI_BCAST(f10p7,    1, MPI_REAL, 0, MPI_COMM_WORLD, ierr)
   CALL MPI_BCAST(f10p7_81, 1, MPI_REAL, 0, MPI_COMM_WORLD, ierr)
 
-  CALL Initiate_EUVAC_flux_crossections   ! uses f10p7 and f10p7_81
+  CALL Initiate_EUV_fluxes_crossections   ! uses f10p7 and f10p7_81
 
   DO i = 1, N_of_orbit_points
 
@@ -54,15 +54,13 @@ PROGRAM MAIN
         call msisinit(switch_legacy=SW)   ! required before first call of MSIS procedure
         call read_apf107dat(year, month, day_of_month, INT(time_ut_h), Ap, f10p7, f10p7_pd, f10p7_81)   ! Ap, f10p7_pd, f10p7_81 used by gtd8d (MSIS); f10p7 and f10p7_81 used by EUVAC
         CALL PREPARE_ENERGY_PITCH_ANGLE_RANGES(i)
+        call PREPARE_COLL_FREQUENCY_RANGES(i)
         CALL PREPARE_FIELDLINE(i)   !####### transfer global indices here !########
      end if
 
      CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
      CALL CALCULATE_PHOTOELECTRON_ENERGY_SPECTRA
-
-!     if (Rank_of_process.eq.0) 
-!     print *, Rank_of_process, " done CALCULATE_PHOTOELECTRON_ENERGY_SPECTRA"
 
      CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
@@ -77,16 +75,18 @@ PROGRAM MAIN
               DEALLOCATE(shared_pfl_point(n)%Ge_m2s_range, STAT = ALLOC_ERR)
               DEALLOCATE(shared_pfl_point(n)%Ge_par_m2s_range, STAT = ALLOC_ERR)
 
-              DEALLOCATE(shared_pfl_point(n)%source_EUV_m3s_range, STAT = ALLOC_ERR)
-              DEALLOCATE(shared_pfl_point(n)%source_photoe_m3s_range, STAT = ALLOC_ERR)
-              DEALLOCATE(shared_pfl_point(n)%source_neutrals_m3s_range, STAT = ALLOC_ERR)
+              DEALLOCATE(shared_pfl_point(n)%source_EUV_m3s_range_channel, STAT = ALLOC_ERR)
+              DEALLOCATE(shared_pfl_point(n)%source_photoe_m3s_range_channel, STAT = ALLOC_ERR)
+              DEALLOCATE(shared_pfl_point(n)%source_neutrals_m3s_range_coll, STAT = ALLOC_ERR)
               DEALLOCATE(shared_pfl_point(n)%source_plasma_m3s_range, STAT = ALLOC_ERR)
-              DEALLOCATE(shared_pfl_point(n)%sink_neutrals_m3s_range, STAT = ALLOC_ERR)
+              DEALLOCATE(shared_pfl_point(n)%sink_neutrals_m3s_range_coll, STAT = ALLOC_ERR)
               DEALLOCATE(shared_pfl_point(n)%sink_plasma_m3s_range, STAT = ALLOC_ERR)
            END DO
         END IF
         DEALLOCATE(shared_pfl_point, STAT = ALLOC_ERR)
      END IF
+     if (allocated(coll_freq_s1_L_colkind_colrange)) deallocate(coll_freq_s1_L_colkind_colrange, STAT = ALLOC_ERR)
+     if (allocated(density_m3_L_colrange))           deallocate(density_m3_L_colrange, STAT = ALLOC_ERR)
      IF (ALLOCATED(evdf)) DEALLOCATE(evdf, STAT = ALLOC_ERR)
 
      CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -245,7 +245,7 @@ SUBROUTINE PREPARE_ENERGY_PITCH_ANGLE_RANGES(op_num)
   READ (9, *) N_ranges
 
   IF (N_ranges.lt.1) THEN
-     N_ranges = MAX(0, N_ranges)  ! to avoid thinking what a negative N_ranges can do in the future
+     N_ranges = 0 ! to avoid thinking what a negative N_ranges can do in the future
      RETURN
   END IF
 
@@ -264,6 +264,8 @@ SUBROUTINE PREPARE_ENERGY_PITCH_ANGLE_RANGES(op_num)
      END IF
   END DO
 
+  CLOSE (9, STATUS = 'KEEP')
+
 ! convert degrees ot radians
   DO i = 1, N_ranges
      min_pitch_angle_range(i) = min_pitch_angle_range(i) * deg_to_rad
@@ -271,6 +273,88 @@ SUBROUTINE PREPARE_ENERGY_PITCH_ANGLE_RANGES(op_num)
   END DO
 
 END SUBROUTINE PREPARE_ENERGY_PITCH_ANGLE_RANGES
+
+
+!-------------------------------
+!
+SUBROUTINE PREPARE_COLL_FREQUENCY_RANGES(op_num)
+
+  USE ParallelOperationValues
+  USE field_line
+  USE PhysicalConstants, ONLY : deg_to_rad
+
+  IMPLICIT NONE
+
+  INTEGER ierr
+
+  INTEGER, INTENT(IN) :: op_num
+
+  LOGICAL exists
+  CHARACTER(1) buf
+  INTEGER ALLOC_ERR
+
+  CHARACTER(33) filename   ! input_coll_freq_ranges_op_NNN.dat
+                           ! ----x----I----x----I----x----I---
+
+  INTEGER i, ios
+
+  interface
+     function convert_int_to_txt_string(int_number, length_of_string)
+       character*(length_of_string) convert_int_to_txt_string
+       integer int_number
+       integer length_of_string
+     end function convert_int_to_txt_string
+  end interface
+
+! default values, expect no ranges
+
+  IF (ALLOCATED(min_w_eV_colrange)) DEALLOCATE(min_w_eV_colrange)
+  IF (ALLOCATED(max_w_eV_colrange)) DEALLOCATE(max_w_eV_colrange)
+
+  N_coll_ranges = 0
+
+!             ----x----I----x----I----x----I---
+  filename = 'input_coll_freq_ranges_op_NNN.dat'
+  filename(27:29) = convert_int_to_txt_string(op_num, 3)
+
+  INQUIRE (FILE = filename, EXIST = exists)
+  IF (.NOT.exists) THEN
+     
+     PRINT '(2x,"##### file ",A33," not found #########")', filename
+     RETURN
+
+  END IF
+
+  PRINT '(2x,"##### found file ",A33," , reading the data file...")', filename
+
+  OPEN (9, FILE = filename)
+
+  READ (9, '(A1)') buf ! # below is the number of energy ranges for calculation of average e-n collision frequencies
+  READ (9, *) N_coll_ranges
+
+  IF (N_coll_ranges.lt.1) THEN
+     N_coll_ranges = 0  ! to avoid thinking what a negative N_coll_ranges can do in the future
+     RETURN
+  END IF
+
+  ALLOCATE(min_w_eV_colrange(1:N_coll_ranges), STAT = ALLOC_ERR)
+  ALLOCATE(max_w_eV_colrange(1:N_coll_ranges), STAT = ALLOC_ERR)
+
+  READ (9, '(A1)') buf ! # below, for each range provide in one line minimal and maximal energy (eV)
+
+  DO i = 1, N_coll_ranges
+     READ (9, *, iostat=ios) min_w_eV_colrange(i), max_w_eV_colrange(i)
+     IF (ios.ne.0) THEN
+        N_coll_ranges = i-1
+        EXIT
+     END IF
+  END DO
+
+  CLOSE (9, STATUS = 'KEEP')
+
+END SUBROUTINE PREPARE_COLL_FREQUENCY_RANGES
+
+
 
 !------------------------------------------
 !

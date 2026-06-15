@@ -163,7 +163,7 @@ subroutine msis_geo( yearday, time_ut_s, alt_km, lat_geo_deg, long_geo_deg, f10p
   Nnm3(1) = 1.0e6 * D(7)    ! hydrogen
   Nnm3(2) = 1.0e6 * D(1)    ! helium
   Nnm3(3) = 1.0e6 * D(8)    ! nitrogen
-  Nnm3(4) = 1.0e6 * D(2)    ! oxygen
+  Nnm3(4) = 1.0e6 * D(2)    ! oxygen                 ################### x2, x4, RESTORE 1.0e6 ##################
   Nnm3(5) = 1.0e6 * D(3)    ! nitrogen molecular
   Nnm3(6) = 1.0e6 * D(10)   ! NO
   Nnm3(7) = 1.0e6 * D(4)    ! oxygen molecular

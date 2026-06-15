@@ -37,6 +37,7 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
   INTEGER, PARAMETER :: max_N_fine_fieldline = 20000
   REAL(8), PARAMETER :: step_km = 1.0_8                ! step to create IGRF field line
   REAL(8), PARAMETER :: R_bottom_limit_km = 6470.0_8   ! bottom of ionosphere (alt = 99 km)
+!  REAL(8), PARAMETER :: R_bottom_limit_km = 6440.0_8   ! bottom of ionosphere (alt = 69 km)
 
   REAL(8), PARAMETER :: max_IRI_alt_km = 2000.0_8      ! maximal altitude of the apex of a field line
                                                        ! the limit corresponds to the altitude limit of the IRI
@@ -108,9 +109,9 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
 
   REAL vector_to_sun(1:3)   ! in GEO
 
-  REAL columnar_content_He_m2, columnar_content_O_m2, columnar_content_N2_m2, columnar_content_O2_m2
+  REAL columnar_content_O_m2, columnar_content_N2_m2, columnar_content_O2_m2
 
-  REAL msis_NnHe_m3, msis_NnO_m3, msis_NnN2_m3, msis_NnO2_m3
+  REAL msis_NnO_m3, msis_NnN2_m3, msis_NnO2_m3
 
   IF ((orbit_point(i_op)%r_km - R_Earth_km).GE.max_IRI_alt_km) THEN
      PRINT '("orbit point ",i4," has altitude ",f8.2," km")', i_op, orbit_point(i_op)%r_km - R_Earth_km
@@ -171,8 +172,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      rvec(3) = z_geo_km(count_plus+1)
      CALL CONVERT_CART_TO_SPHERICAL(rvec, r_km, theta_geo, phi_geo) 
 
-!print *, rvec, r_km, theta_geo, phi_geo
-
      alt_km =  r_km-R_Earth_km
 
      IF (r_km.LT.R_bottom_limit_km) EXIT
@@ -188,8 +187,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      colat_geo_deg = theta_geo * rad_to_deg
      lon_geo_deg   = phi_geo   * rad_to_deg
   END DO
-
-!print *, count_plus
 
 ! return to the spacecraft location
   r_km      = orbit_point(i_op)%r_km
@@ -228,8 +225,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      rvec(3) = z_geo_km(count_minus-1)
      CALL CONVERT_CART_TO_SPHERICAL(rvec, r_km, theta_geo, phi_geo) 
 
-!print *, rvec, r_km, theta_geo, phi_geo
-
      alt_km =  r_km - R_Earth_km
 
      IF (r_km.LT.R_bottom_limit_km) EXIT
@@ -246,8 +241,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      lon_geo_deg   = phi_geo   * rad_to_deg
   END DO
 
-!print *, count_minus
-
 ! transfer necessary points to the pfl object, note that we want to keep the point i=0 where the spacecraft is
 
   n_skip = MAX(1, INT(pfl_desired_dL_km / step_km))
@@ -256,8 +249,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
   count_plus_use  = INT(  count_plus/n_skip) * n_skip
   pfl_N_of_points = 1 + count_plus_use/n_skip + count_minus_use/n_skip
   pfl_i_spacecraft = count_minus_use/n_skip + 1               ! index of spacecraft location point in pfl arrays
-
-!print *, n_skip, count_minus, count_plus, count_minus_use, count_plus_use
 
   ALLOCATE(pfl_point_coords(1:pfl_N_of_points), STAT = ALLOC_ERR)
   ALLOCATE(shared_pfl_point(1:pfl_N_of_points), STAT = ALLOC_ERR)
@@ -306,11 +297,9 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
 
 ! set default zero values of neutral densities and -1 columnar content
   DO i = 1, pfl_N_of_points
-     shared_pfl_point(i)%Nn_He_m3 = 0.0_8
      shared_pfl_point(i)%Nn_O_m3 = 0.0_8
      shared_pfl_point(i)%Nn_N2_m3 = 0.0_8
      shared_pfl_point(i)%Nn_O2_m3 = 0.0_8
-     shared_pfl_point(i)%columnar_content_He_m2 = -1.0_8
      shared_pfl_point(i)%columnar_content_O_m2 = -1.0_8
      shared_pfl_point(i)%columnar_content_N2_m2 = -1.0_8
      shared_pfl_point(i)%columnar_content_O2_m2 = -1.0_8
@@ -334,7 +323,7 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
 ! required by MSIS
 !#######     CALL read_apf107dat(year, month, day_of_month, INT(time_ut_h), msis_Ap, msis_f10p7_pd, msis_f10p7_81)
 !#######     call msisinit(switch_legacy=SW)
-!####### called outside in the main program now
+!####### called outside, in the main program now
 
   print '("calculating plasma and neutral densities along the field line ...")'
 
@@ -352,7 +341,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      IF (alt_km.LE.alt_thermosphere_km) THEN
        CALL msis_geo( yearday, time_ut_s, alt_km, lat_geo_deg_4, long_geo_deg_4, f10p7_81, f10p7_pd, Ap, Nnm3, TnK )
 
-        shared_pfl_point(i)%Nn_He_m3 = Nnm3(2)
         shared_pfl_point(i)%Nn_O_m3  = Nnm3(4)
         shared_pfl_point(i)%Nn_N2_m3 = Nnm3(5)
         shared_pfl_point(i)%Nn_O2_m3 = Nnm3(7)
@@ -424,18 +412,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      IF (ALLOCATED(rbufer2)) DEALLOCATE(rbufer2, STAT = ALLOC_ERR)
      ALLOCATE( rbufer(istart:iend), STAT = ALLOC_ERR)
      ALLOCATE(rbufer2(istart:iend), STAT = ALLOC_ERR)
-! He
-     DO i = istart, iend
-        rbufer(i)  = shared_pfl_point(i)%Nn_He_m3
-        rbufer2(i) = shared_pfl_point(i)%L_m   ! needed for interpolation
-     END DO
-     CALL Clean_array_from_NaNs_log(istart, iend, rbufer, rbufer2, count_bad)
-     IF (count_bad.GT.0) THEN
-        PRINT '("Clean_array_from_NaNs_log-3 found and cleaned ",i6," bad Nn_He_m3 values")', count_bad
-        DO i = istart, iend
-           shared_pfl_point(i)%Nn_He_m3 = rbufer(i)
-        END DO
-     END IF
 ! O
      DO i = istart, iend
         rbufer(i)  = shared_pfl_point(i)%Nn_O_m3
@@ -490,18 +466,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
         IF (ALLOCATED(rbufer2)) DEALLOCATE(rbufer2, STAT = ALLOC_ERR)
         ALLOCATE( rbufer(istart:iend), STAT = ALLOC_ERR)
         ALLOCATE(rbufer2(istart:iend), STAT = ALLOC_ERR)
-! He
-        DO i = istart, iend
-           rbufer(i)  = shared_pfl_point(i)%Nn_He_m3
-           rbufer2(i) = shared_pfl_point(i)%L_m   ! needed for interpolation
-        END DO
-        CALL Clean_array_from_NaNs_log(istart, iend, rbufer, rbufer2, count_bad)
-        IF (count_bad.GT.0) THEN
-           PRINT '("Clean_array_from_NaNs_log-7 found and cleaned ",i6," bad Nn_He_m3 values")', count_bad
-           DO i = istart, iend
-              shared_pfl_point(i)%Nn_He_m3 = rbufer(i)
-           END DO
-        END IF
 ! O
         DO i = istart, iend
            rbufer(i)  = shared_pfl_point(i)%Nn_O_m3
@@ -570,18 +534,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      IF (ALLOCATED(rbufer2)) DEALLOCATE(rbufer2, STAT = ALLOC_ERR)
      ALLOCATE( rbufer(istart:iend), STAT = ALLOC_ERR)
      ALLOCATE(rbufer2(istart:iend), STAT = ALLOC_ERR)
-! He
-     DO i = istart, iend
-        rbufer(i)  = shared_pfl_point(i)%Nn_He_m3
-        rbufer2(i) = shared_pfl_point(i)%L_m   ! needed for interpolation
-     END DO
-     CALL Clean_array_from_NaNs_log(istart, iend, rbufer, rbufer2, count_bad)
-     IF (count_bad.GT.0) THEN
-        PRINT '("Clean_array_from_NaNs_log-11 found and cleaned ",i6," bad Nn_He_m3 values")', count_bad
-        DO i = istart, iend
-           shared_pfl_point(i)%Nn_He_m3 = rbufer(i)
-        END DO
-     END IF
 ! O
      DO i = istart, iend
         rbufer(i)  = shared_pfl_point(i)%Nn_O_m3
@@ -644,7 +596,6 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
 ! note, if a point is above the EUV ionization threshold altitude, 
 ! the columnar content keeps its default value of -1 which prevents photoelectron emission from this point
 
-     columnar_content_He_m2 = shared_pfl_point(i)%Nn_He_m3
      columnar_content_O_m2  = shared_pfl_point(i)%Nn_O_m3
      columnar_content_N2_m2 = shared_pfl_point(i)%Nn_N2_m3
      columnar_content_O2_m2 = shared_pfl_point(i)%Nn_O2_m3
@@ -664,14 +615,12 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
 
 ! ray to Sun passes through dense atmosphere or the Earth, no direct EUV effects in the origin point
         IF (r_km.LT.R_bottom_limit_km) THEN
-           columnar_content_He_m2 = -1.0
            columnar_content_O_m2  = -1.0
            columnar_content_N2_m2 = -1.0
            columnar_content_O2_m2 = -1.0
            EXIT
         END IF
 
-        msis_NnHe_m3 = 0.0
         msis_NnO_m3  = 0.0
         msis_NnN2_m3 = 0.0
         msis_NnO2_m3 = 0.0
@@ -684,12 +633,10 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
 
         CALL msis_geo( yearday, time_ut_s, alt_km, lat_geo_deg_4, long_geo_deg_4, f10p7_81, f10p7_pd, Ap, Nnm3, TnK )   ! note that there is also msis_sm ##########
 
-        IF (ieee_is_finite(Nnm3(2))) msis_NnHe_m3 = Nnm3(2)
         IF (ieee_is_finite(Nnm3(4))) msis_NnO_m3  = Nnm3(4)
         IF (ieee_is_finite(Nnm3(5))) msis_NnN2_m3 = Nnm3(5)
         IF (ieee_is_finite(Nnm3(7))) msis_NnO2_m3 = Nnm3(7)
 
-        columnar_content_He_m2 = columnar_content_He_m2 + msis_NnHe_m3 !Nnm3(2)
         columnar_content_O_m2  = columnar_content_O_m2  + msis_NnO_m3  !Nnm3(4)
         columnar_content_N2_m2 = columnar_content_N2_m2 + msis_NnN2_m3 !Nnm3(5)
         columnar_content_O2_m2 = columnar_content_O2_m2 + msis_NnO2_m3 !Nnm3(7)
@@ -697,12 +644,10 @@ SUBROUTINE PREPARE_FIELDLINE(i_op)
      END DO   ! end of cycle advancing one ray
 
 ! account for previously omitted factors
-     IF (columnar_content_He_m2.GE.0.0) columnar_content_He_m2 = columnar_content_He_m2 * ds_km * 1.0e3
      IF (columnar_content_O_m2.GE.0.0)  columnar_content_O_m2  = columnar_content_O_m2  * ds_km * 1.0e3
      IF (columnar_content_N2_m2.GE.0.0) columnar_content_N2_m2 = columnar_content_N2_m2 * ds_km * 1.0e3
      IF (columnar_content_O2_m2.GE.0.0) columnar_content_O2_m2 = columnar_content_O2_m2 * ds_km * 1.0e3
 
-     shared_pfl_point(i)%columnar_content_He_m2 = columnar_content_He_m2
      shared_pfl_point(i)%columnar_content_O_m2  = columnar_content_O_m2
      shared_pfl_point(i)%columnar_content_N2_m2 = columnar_content_N2_m2
      shared_pfl_point(i)%columnar_content_O2_m2 = columnar_content_O2_m2
