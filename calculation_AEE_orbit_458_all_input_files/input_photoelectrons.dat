@@ -1,16 +1,20 @@
-# number of primary particles per solar flux energy bin (>0)
+# solar EUV spectrum model (0=EUVAC, 1=f76, 2=f74113)
+   1
+# for EUVAC only, split each 50-Angstrom-wide-bin-averaged flux into this many monochromatic fluxes (>=1)
   50
+# maximal number of primary particles per solar flux (>0)
+  50
+# maximal EUV photon energy flux creating ONE primary particle per solar flux (10^9 eV/cm^2/s)
+  0.5
+# precision factor for calculation of time step due to e-n collisions (<=0.2)
+  0.1
 # desired distance between points on a field line [km]
   5.0
-# number of energy bins in electron energy distribution function (EEDF)
-  250
-# energy bin size of the EEDF [eV]
-  1.0
 # number of parallel velocity bins in one direction in electron velocity distribution function
-  100
+  350
 # number of transverse velocity bins in electron velocity distribution function
-  100
+  350  100
 # maximal energy in the parallel direction [eV]
-  250.0
+  150.0
 # maximal energy in the transverse direction [eV]
-  250.0
+  150.0
