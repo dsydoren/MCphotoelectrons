@@ -1,3 +1,4 @@
+###FC := mpiifort
 FC := mpif90
 CC := mpicc
 
@@ -28,6 +29,9 @@ OBJ := msis_constants.o \
           mc_PhotoIndividualCollFreqs.o \
           mc_CoordTransform.o \
           mc_EUVInitiateArrays.o \
+          mc_EUV_set_EUVAC.o \
+          mc_EUV_use_f74113.o \
+          mc_EUV_use_f76.o \
           mc_EUVproc.o \
           mc_GeneralServiceProc.o \
           mc_MainProgram.o \
