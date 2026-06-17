@@ -1,4 +1,4 @@
-# number of points along the spacecraft trajectory
+# number of points along the spacecraft trajectory, numbers of first and last points to be processed (provide 3 integers in one line below)
   15   1   15
 # year  month  day-of-month  UT-hours/minutes/seconds altitutude(km) GEO-latitude/longitude(deg) LT SZA Num
 75 12 27  2  3 30  2.955E+02  1.812E+01  8.113E+01  7.459E+00  7.830E+01  4.580E+02
