@@ -87,6 +87,8 @@ MODULE SpacecraftValues
 
   INTEGER N_of_orbit_points
   INTEGER orbit_number
+  INTEGER first_op    ! >=1                 ! only orbit points with ordering number within this range will be processed
+  INTEGER last_op     ! <=N_of_orbit_points !
 
   TYPE spacecraft_data
      INTEGER year

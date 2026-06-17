@@ -38,12 +38,14 @@ PROGRAM MAIN
   CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
   CALL MPI_BCAST(N_of_orbit_points, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+  CALL MPI_BCAST(         first_op, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+  CALL MPI_BCAST(          last_op, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
   CALL MPI_BCAST(f10p7,    1, MPI_REAL, 0, MPI_COMM_WORLD, ierr)
   CALL MPI_BCAST(f10p7_81, 1, MPI_REAL, 0, MPI_COMM_WORLD, ierr)
 
   CALL Initiate_EUV_fluxes_crossections   ! uses f10p7 and f10p7_81
 
-  DO i = 1, N_of_orbit_points
+  DO i = first_op, last_op  !1, N_of_orbit_points
 
      if (Rank_of_process.eq.0) then
         CALL UPDATE_TIME(orbit_point(i)%year, orbit_point(i)%month, orbit_point(i)%day_of_month, orbit_point(i)%ut_h)
@@ -133,20 +135,23 @@ SUBROUTINE PREPARE_SPACECRAFT_DATA
 
   END IF
 
-  IF (Rank_of_process.EQ.0) THEN
-     PRINT '(2x,"Process ",i3," : input_spacecraft_orbit.dat is found. Reading the data file...")', Rank_of_process
-  END IF
+  PRINT '(2x,"Process ",i3," : input_spacecraft_orbit.dat is found. Reading the data file...")', Rank_of_process
 
   OPEN (9, FILE = 'input_spacecraft_orbit.dat')
 
-  READ (9, '(A1)') buf ! number of points along the spacecraft trajectory
-  READ (9, *) N_of_orbit_points, orbit_number
+  READ (9, '(A1)') buf ! number of points along the spacecraft trajectory, numbers of first and last points to be processed (provide 3 integers in one line below)
+  READ (9, *) N_of_orbit_points, first_op, last_op
+
+  first_op = MIN(MAX(1, first_op), N_of_orbit_points)
+  last_op  = MIN(MAX(1,  last_op), N_of_orbit_points)
+
+  PRINT '(2x,"Process ",i3," : there are ",i3," orbit points in total, points to be processed range from ",i3," to ",i3)', Rank_of_process, N_of_orbit_points, first_op, last_op
 
   ALLOCATE(orbit_point(1:N_of_orbit_points), STAT = ALLOC_ERR)
  
   READ (9, '(A1)') buf ! year month day-of-month UT-hours/minutes/second altitutude(km) GEO-latitude/longitude(deg) LT SZA Num
  
-  DO n = 1, N_of_orbit_points
+  DO n = 1, N_of_orbit_points   ! note, we read the full set here but use only the range [first_op:last_op] 
 
      READ(9, *) orbit_point(n)%year, &
               & orbit_point(n)%month, &
